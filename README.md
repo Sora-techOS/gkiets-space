@@ -32,4 +32,4 @@ npm run build
 
 ---
 
-*Built by [Gia Kiet]((https://github.com/Sora-techOS)) as a first step into desktop app development.*
+*Built by [Gia Kiet](https://github.com/Sora-techOS) as a first step into desktop app development.*
