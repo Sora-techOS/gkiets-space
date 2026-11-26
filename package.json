@@ -1,0 +1,54 @@
+{
+  "name": "gkiets-space",
+  "version": "1.0.0",
+  "description": "gkiet's space — Chill Study Planner with Spotify Now Playing & Pomodoro",
+  "main": "main.js",
+  "author": "Gia Kiet",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.giakiet.gkietsspace",
+    "productName": "gkiet's space",
+    "afterPack": "./afterPack.js",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "bg.jpg",
+      "icon.png",
+      "icon.ico"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "gkiet's space",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "artifactName": "gkiet's space Setup.exe"
+    }
+  }
+}

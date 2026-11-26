@@ -1,0 +1,2261 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="gkiet's space — Chill Study Planner with Spotify Now Playing & Pomodoro.">
+<meta name="theme-color" content="#0a0c12">
+<title>gkiet's space</title>
+
+<!-- Fonts: Google Fonts via CDN (no local path) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+/* ==================== ROOT VARIABLES ==================== */
+:root {
+  --bg-dark: rgba(15, 17, 25, 0.78);
+  --bg-card: rgba(15, 17, 25, 0.78);
+  --bg-glass: rgba(255,255,255,0.05);
+  --bg-glass-hover: rgba(255,255,255,0.09);
+  --accent: #c084fc;
+  --accent2: #818cf8;
+  --accent3: #34d399;
+  --accent-warn: #f59e0b;
+  --accent-danger: #f87171;
+  --text-main: #e2e8f0;
+  --text-muted: #64748b;
+  --text-soft: #94a3b8;
+  --border: rgba(255,255,255,0.09);
+  --border-hover: rgba(255,255,255,0.16);
+  --radius: 14px;
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
+  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Courier New', monospace;
+  --sidebar-w: 250px;
+  --sidebar-r: 280px;
+  --topbar-h: 56px;
+}
+
+/* ==================== RESET & BASE ==================== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  font-family: var(--font);
+  background-color: #0a0c12;
+  background-image: linear-gradient(rgba(10, 12, 18, 0.4), rgba(10, 12, 18, 0.6)), url('./bg.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  color: var(--text-main);
+  overflow: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+/* ==================== BACKGROUND CANVAS ==================== */
+#bg-canvas { position: fixed; inset: 0; z-index: 0; }
+#rain-overlay { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0; transition: opacity 1.2s; }
+
+/* ==================== LAYOUT (3-column desktop) ==================== */
+#app {
+  position: relative; z-index: 10;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr var(--sidebar-r);
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100vh;
+  transition: grid-template-columns 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+#app.sidebar-collapsed {
+  grid-template-columns: 0px 1fr var(--sidebar-r);
+}
+
+/* ==================== TOPBAR ==================== */
+#topbar {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 16px;
+  background: rgba(15, 17, 25, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  z-index: 20;
+  overflow: hidden;
+}
+
+/* Sidebar collapse toggle button */
+#sidebar-toggle {
+  background: none; border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 8px; width: 28px; height: 28px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; transition: all 0.2s; flex-shrink: 0;
+}
+#sidebar-toggle:hover { color: var(--accent); border-color: var(--accent); background: var(--bg-glass); }
+#sidebar-toggle .arrow { display: inline-block; transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); }
+#app.sidebar-collapsed #sidebar-toggle .arrow { transform: rotate(180deg); }
+
+/* ===== SPOTIFY NOW PLAYING WIDGET (Discord-inspired) ===== */
+#spotify-widget {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(15, 17, 25, 0.85);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 11px; padding: 4px 8px;
+  backdrop-filter: blur(12px);
+  width: 285px; flex-shrink: 0;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+#spotify-widget.playing {
+  border-color: rgba(29,185,84,0.45);
+  box-shadow: 0 0 14px rgba(29,185,84,0.12);
+}
+
+#sp-art {
+  width: 30px; height: 30px; border-radius: 6px; flex-shrink: 0;
+  background: rgba(29,185,84,0.14);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+#sp-art svg { width: 17px; height: 17px; fill: #1DB954; }
+#sp-art img { width: 100%; height: 100%; object-fit: cover; border-radius: 6px; display: block; }
+#spotify-widget.playing #sp-art {
+  box-shadow: 0 0 8px rgba(29,185,84,0.35);
+}
+
+#sp-info { flex: 1; min-width: 0; overflow: hidden; }
+#sp-track-wrap {
+  width: 100%; overflow: hidden; white-space: nowrap; position: relative;
+}
+#sp-track {
+  display: inline-block;
+  font-size: 0.74rem; font-weight: 700; color: var(--text-main);
+  line-height: 1.25; white-space: nowrap;
+}
+#sp-track.marquee {
+  animation: sp-marquee 9s linear infinite;
+  padding-right: 28px;
+}
+@keyframes sp-marquee {
+  0%, 15%   { transform: translateX(0); }
+  85%, 100% { transform: translateX(var(--marquee-dist, -40%)); }
+}
+#sp-artist {
+  font-size: 0.62rem; color: var(--text-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  line-height: 1.25;
+}
+#spotify-widget:not(.playing) #sp-track { color: var(--text-soft); font-weight: 600; }
+#spotify-widget:not(.playing) #sp-artist { color: var(--text-muted); }
+
+.sp-controls {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.sp-ctrl-btn {
+  background: none; border: none; color: #b3b3b3;
+  cursor: pointer; width: 22px; height: 22px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, transform 0.15s, background 0.15s;
+  padding: 0;
+}
+.sp-ctrl-btn svg { width: 13px; height: 13px; fill: currentColor; }
+.sp-ctrl-btn:hover { color: #ffffff; }
+.sp-ctrl-btn:active { transform: scale(0.92); }
+.sp-ctrl-btn.sp-play-btn {
+  width: 26px; height: 26px;
+  background: #ffffff; color: #000000;
+}
+.sp-ctrl-btn.sp-play-btn:hover {
+  background: #f0f0f0; color: #000000; transform: scale(1.06);
+}
+.sp-ctrl-btn.sp-play-btn svg { width: 12px; height: 12px; fill: #000000; }
+
+/* Mode menu collapsible group */
+#mode-menu-wrap {
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+#mode-menu-items {
+  display: flex; align-items: center; gap: 6px;
+  overflow: hidden; max-width: 520px; opacity: 1;
+  transition: max-width 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+  white-space: nowrap;
+}
+#mode-menu-items.collapsed {
+  max-width: 0; opacity: 0; pointer-events: none;
+}
+#mode-menu-toggle {
+  background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 7px; width: 24px; height: 24px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; font-weight: 700; transition: all 0.2s; flex-shrink: 0;
+}
+#mode-menu-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Not connected state */
+#sp-connect-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(30,215,96,0.1); border: 1px solid rgba(30,215,96,0.3);
+  color: #1DB954; border-radius: 7px; padding: 3px 9px; cursor: pointer;
+  font-size: 0.68rem; font-family: inherit; transition: all 0.2s; flex-shrink: 0;
+  white-space: nowrap;
+}
+#sp-connect-btn:hover { background: rgba(30,215,96,0.18); }
+#sp-connect-btn svg { width: 12px; height: 12px; fill: #1DB954; flex-shrink: 0; }
+
+/* Spotify setup modal */
+#sp-setup-modal {
+  position: fixed; inset: 0; z-index: 110; background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#sp-setup-modal.open { opacity: 1; pointer-events: all; }
+#sp-setup-box {
+  background: rgba(18,18,30,0.98); border: 1px solid var(--border);
+  border-radius: 18px; padding: 28px; width: 420px; max-width: 95vw;
+  box-shadow: var(--shadow); transform: translateY(10px); transition: transform 0.2s;
+}
+#sp-setup-modal.open #sp-setup-box { transform: translateY(0); }
+.sp-setup-title { font-size: 1rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.sp-setup-desc { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5; }
+.sp-step { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.sp-step-num {
+  width: 20px; height: 20px; border-radius: 50%; background: rgba(30,215,96,0.15);
+  border: 1px solid rgba(30,215,96,0.4); color: #1DB954; font-size: 0.65rem;
+  font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px;
+}
+.sp-step-text { font-size: 0.72rem; color: var(--text-soft); line-height: 1.5; }
+.sp-step-text a { color: #1DB954; text-decoration: none; }
+.sp-step-text a:hover { text-decoration: underline; }
+.sp-step-text code {
+  background: var(--bg-glass); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 5px; font-size: 0.68rem; font-family: var(--mono);
+  color: var(--accent); user-select: all;
+}
+.sp-input-row { margin-bottom: 10px; }
+.sp-input-label { font-size: 0.65rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; display: block; }
+.sp-input {
+  width: 100%; background: var(--bg-glass); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-main); font-family: var(--mono);
+  font-size: 0.75rem; padding: 7px 10px; outline: none; transition: border-color 0.2s;
+}
+.sp-input:focus { border-color: #1DB954; }
+.sp-btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+.sp-cancel { background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-family: inherit; font-size: 0.78rem; }
+.sp-auth-btn {
+  background: #1DB954; border: none; color: white; border-radius: 8px;
+  padding: 7px 16px; cursor: pointer; font-family: inherit; font-weight: 700;
+  font-size: 0.78rem; transition: opacity 0.2s; display: flex; align-items: center; gap: 6px;
+}
+.sp-auth-btn:hover { opacity: 0.88; }
+.sp-auth-btn svg { width: 14px; height: 14px; fill: white; }
+.topbar-sep { width: 1px; height: 22px; background: var(--border); flex-shrink: 0; }
+
+.nav-btn {
+  background: none; border: none; color: var(--text-soft); cursor: pointer;
+  padding: 5px 10px; border-radius: 8px; font-size: 0.8rem; font-family: inherit;
+  transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.nav-btn:hover, .nav-btn.active { background: var(--bg-glass); color: var(--accent); }
+
+.scene-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 7px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;
+  font-family: inherit; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+}
+.scene-btn:hover, .scene-btn.active {
+  background: var(--bg-glass); color: var(--accent); border-color: var(--accent);
+}
+
+/* Scene buttons group — hidden on small screens */
+#scene-group { display: flex; gap: 4px; }
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Clock */
+#clock-wrap { text-align: right; }
+#clock-display { font-size: 1rem; font-weight: 700; color: var(--accent); font-family: var(--mono); letter-spacing: 1px; }
+#date-display { font-size: 0.65rem; color: var(--text-muted); }
+
+/* Mobile menu toggle */
+#mobile-menu-btn {
+  display: none; background: none; border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 8px; padding: 5px 8px; cursor: pointer; font-size: 1rem;
+}
+
+/* ==================== MUSIC PLAYER ==================== */
+#music-player {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-glass); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 10px; backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+#music-player button {
+  background: none; border: none; cursor: pointer; color: var(--text-soft);
+  font-size: 0.9rem; transition: color 0.2s; padding: 2px 3px;
+}
+#music-player button:hover { color: var(--accent); }
+#track-name { font-size: 0.68rem; color: var(--text-soft); max-width: 110px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#vol-slider { width: 55px; accent-color: var(--accent); cursor: pointer; }
+.vinyl-icon { animation: spin 4s linear infinite; display: inline-block; font-size: 0.95rem; }
+.vinyl-icon.paused { animation-play-state: paused; }
+
+/* Ambient sound mixer button */
+#ambient-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 7px; padding: 3px 8px; cursor: pointer; font-size: 0.68rem;
+  font-family: inherit; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;
+}
+#ambient-btn:hover, #ambient-btn.active {
+  background: var(--bg-glass); color: var(--accent3); border-color: var(--accent3);
+}
+
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ==================== SIDEBAR LEFT ==================== */
+#sidebar-left {
+  background: rgba(15, 17, 25, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid var(--border); overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  min-width: 0;
+}
+#app.sidebar-collapsed #sidebar-left {
+  overflow: hidden; border-right-color: transparent;
+}
+
+/* Mini Calendar */
+#mini-cal { padding: 14px; border-bottom: 1px solid var(--border); }
+.mini-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mini-cal-header h3 { font-size: 0.82rem; font-weight: 600; color: var(--text-main); }
+.mini-cal-header button {
+  background: none; border: none; color: var(--text-soft); cursor: pointer;
+  font-size: 1rem; padding: 2px 5px; border-radius: 6px; transition: color 0.2s;
+}
+.mini-cal-header button:hover { color: var(--accent); }
+.mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.mini-cal-dow { font-size: 0.6rem; color: var(--text-muted); text-align: center; padding: 2px; font-weight: 600; }
+.mini-cal-day {
+  font-size: 0.68rem; text-align: center; padding: 4px 1px; border-radius: 6px;
+  cursor: pointer; color: var(--text-soft); transition: all 0.15s; position: relative;
+}
+.mini-cal-day:hover { background: var(--bg-glass-hover); color: var(--text-main); }
+.mini-cal-day.today { background: var(--accent); color: white; font-weight: 700; }
+.mini-cal-day.selected:not(.today) { background: rgba(192,132,252,0.22); color: var(--accent); font-weight: 600; }
+.mini-cal-day.other-month { color: var(--text-muted); opacity: 0.35; }
+.mini-cal-day.has-event::after {
+  content: ''; display: block; width: 3px; height: 3px;
+  border-radius: 50%; background: var(--accent3);
+  margin: 1px auto 0; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+}
+
+/* Task List */
+#task-panel { padding: 14px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.panel-title {
+  font-size: 0.68rem; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 5px;
+}
+.panel-title .badge {
+  background: var(--accent); color: white; font-size: 0.58rem;
+  padding: 1px 5px; border-radius: 10px; font-weight: 700;
+}
+.task-input-row { display: flex; gap: 5px; margin-bottom: 8px; flex-shrink: 0; }
+.task-input {
+  flex: 1; background: var(--bg-glass); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-main); font-family: inherit; font-size: 0.75rem; padding: 6px 9px;
+  outline: none; transition: border-color 0.2s;
+}
+.task-input:focus { border-color: var(--accent); }
+.task-input::placeholder { color: var(--text-muted); }
+.btn-add-task {
+  background: var(--accent); border: none; color: white; border-radius: 8px; padding: 6px 10px;
+  cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s; flex-shrink: 0;
+}
+.btn-add-task:hover { opacity: 0.85; }
+#task-list {
+  display: flex; flex-direction: column; gap: 3px; overflow-y: auto;
+  flex: 1; scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.task-item {
+  display: flex; align-items: center; gap: 7px; padding: 6px 9px; border-radius: 8px;
+  background: var(--bg-glass); border: 1px solid transparent; transition: all 0.2s;
+}
+.task-item:hover { border-color: var(--border-hover); background: var(--bg-glass-hover); }
+.task-item.done .task-text { text-decoration: line-through; color: var(--text-muted); opacity: 0.7; }
+.task-check {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border);
+  background: none; cursor: pointer; flex-shrink: 0; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.task-check:hover { border-color: var(--accent3); }
+.task-check.checked { background: var(--accent3); border-color: var(--accent3); }
+.task-check.checked::after { content: '✓'; color: white; font-size: 0.6rem; font-weight: 700; }
+.task-text { flex: 1; font-size: 0.75rem; color: var(--text-main); min-width: 0; word-break: break-word; }
+.task-difficulty { display: flex; gap: 1px; flex-shrink: 0; }
+.diff-star { cursor: pointer; font-size: 0.65rem; color: var(--text-muted); transition: color 0.15s; }
+.diff-star.active { color: var(--accent-warn); }
+.diff-star:hover { color: var(--accent-warn); }
+.task-delete {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 0.7rem; opacity: 0; transition: opacity 0.2s; padding: 1px 3px;
+  flex-shrink: 0;
+}
+.task-item:hover .task-delete { opacity: 1; }
+
+/* Pomodoro */
+#pomodoro-panel { padding: 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.pomo-display { text-align: center; margin: 8px 0; }
+#pomo-timer {
+  font-size: 2rem; font-weight: 700; color: var(--accent);
+  font-family: var(--mono); letter-spacing: 3px;
+}
+#pomo-label { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+.pomo-progress { background: var(--border); border-radius: 4px; height: 3px; margin: 6px 0; overflow: hidden; }
+.pomo-progress-bar {
+  height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2));
+  border-radius: 4px; transition: width 1s linear;
+}
+.pomo-controls { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+.pomo-btn {
+  background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 8px; padding: 4px 9px; cursor: pointer; font-size: 0.68rem;
+  font-family: inherit; transition: all 0.2s;
+}
+.pomo-btn:hover { background: rgba(192,132,252,0.12); color: var(--accent); border-color: var(--accent); }
+.pomo-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.pomo-btn.primary:hover { opacity: 0.85; }
+.pomo-sessions { font-size: 0.65rem; color: var(--text-muted); text-align: center; margin-top: 5px; letter-spacing: 2px; }
+
+/* Focus Stats */
+#focus-stats { padding: 10px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
+.stat-label { font-size: 0.68rem; color: var(--text-muted); }
+.stat-val { font-size: 0.72rem; font-weight: 600; color: var(--text-main); }
+.stat-val.warn { color: var(--accent-warn); }
+.stat-val.danger { color: var(--accent-danger); }
+
+/* ==================== MAIN CALENDAR ==================== */
+#main-area {
+  overflow: hidden; display: flex; flex-direction: column; min-width: 0;
+  background: rgba(15, 17, 25, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+#cal-header {
+  padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border); background: rgba(15, 17, 25, 0.78);
+  backdrop-filter: blur(12px); flex-shrink: 0; flex-wrap: wrap;
+}
+.cal-nav-btn {
+  background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 7px; padding: 4px 9px; cursor: pointer; font-size: 0.8rem;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.cal-nav-btn:hover { color: var(--accent); border-color: var(--accent); }
+#cal-title { font-size: 0.9rem; font-weight: 600; color: var(--text-main); min-width: 140px; }
+.view-tabs { display: flex; gap: 2px; background: var(--bg-glass); border-radius: 8px; padding: 2px; }
+.view-tab {
+  background: none; border: none; color: var(--text-soft); cursor: pointer;
+  padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; font-family: inherit;
+  transition: all 0.2s;
+}
+.view-tab.active { background: var(--accent); color: white; font-weight: 600; }
+.btn-new-event {
+  margin-left: auto; background: var(--accent); border: none; color: white;
+  border-radius: 9px; padding: 6px 13px; cursor: pointer; font-size: 0.78rem;
+  font-family: inherit; transition: opacity 0.2s;
+  display: flex; align-items: center; gap: 5px; font-weight: 600; flex-shrink: 0;
+}
+.btn-new-event:hover { opacity: 0.85; }
+
+/* Calendar container */
+#calendar-container { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+/* Week / Day view header */
+.week-header {
+  grid-column: 1 / -1; display: grid;
+  grid-template-columns: 50px repeat(7, 1fr);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  padding-right: 4px;
+}
+.week-header-cell { padding: 7px 3px; text-align: center; border-left: 1px solid var(--border); }
+.week-header-cell:first-child { border-left: none; }
+.wh-dow { font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+.wh-day {
+  font-size: 1.2rem; font-weight: 700; color: var(--text-soft);
+  border-radius: 50%; width: 34px; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 2px auto 0; cursor: pointer; transition: all 0.2s;
+}
+.wh-day:hover { background: var(--bg-glass-hover); }
+.wh-day.today { background: var(--accent); color: white; }
+
+/* Scrollable calendar body */
+.week-body {
+  display: grid; grid-template-columns: 50px repeat(7, 1fr);
+  overflow-y: scroll; flex: 1;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.time-col { position: relative; border-right: 1px solid var(--border); }
+.time-col-header { background: none; border-right: 1px solid var(--border); }
+.time-label {
+  position: absolute; right: 5px; font-size: 0.58rem;
+  color: var(--text-muted); transform: translateY(-50%); user-select: none;
+}
+.day-col { border-left: 1px solid var(--border); position: relative; }
+.hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border); }
+.half-line { position: absolute; left: 0; right: 0; border-top: 1px dashed rgba(255,255,255,0.025); }
+.now-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--accent-danger); z-index: 5; pointer-events: none; }
+.now-line::before {
+  content: ''; position: absolute; left: -4px; top: -3px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent-danger);
+}
+
+/* Event chips */
+.event-chip {
+  position: absolute; left: 2px; right: 2px; border-radius: 6px; padding: 2px 6px;
+  font-size: 0.65rem; cursor: pointer; overflow: hidden; z-index: 4;
+  transition: transform 0.15s, box-shadow 0.15s, z-index 0s;
+  border-left: 3px solid; display: flex; flex-direction: column; gap: 1px;
+  user-select: none;
+}
+.event-chip:hover { transform: translateX(1px); box-shadow: 0 4px 16px rgba(0,0,0,0.5); z-index: 20; }
+.event-chip .ec-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event-chip .ec-time { font-size: 0.58rem; opacity: 0.8; }
+
+/* Event colors */
+.ev-purple { background: rgba(192,132,252,0.18); border-color: #c084fc; color: #e9d5ff; }
+.ev-blue   { background: rgba(129,140,248,0.18); border-color: #818cf8; color: #c7d2fe; }
+.ev-green  { background: rgba(52,211,153,0.18);  border-color: #34d399; color: #a7f3d0; }
+.ev-amber  { background: rgba(245,158,11,0.18);  border-color: #f59e0b; color: #fde68a; }
+.ev-red    { background: rgba(248,113,113,0.18); border-color: #f87171; color: #fecaca; }
+.ev-teal   { background: rgba(45,212,191,0.18);  border-color: #2dd4bf; color: #99f6e4; }
+.ev-pink   { background: rgba(236,72,153,0.18);  border-color: #ec4899; color: #fbcfe8; }
+
+/* Month view */
+.month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); }
+.month-cell {
+  background: var(--bg-dark); min-height: 90px; padding: 5px;
+  transition: background 0.15s; cursor: pointer; position: relative;
+}
+.month-cell:hover { background: rgba(22,22,36,0.95); }
+.month-cell.today { background: rgba(192,132,252,0.05); }
+.month-cell.other-month { opacity: 0.35; }
+.mc-day { font-size: 0.72rem; font-weight: 600; color: var(--text-soft); margin-bottom: 3px; }
+.month-cell.today .mc-day { color: var(--accent); font-weight: 700; }
+.mc-events { display: flex; flex-direction: column; gap: 2px; }
+.mc-ev-chip {
+  font-size: 0.6rem; padding: 1px 4px; border-radius: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid;
+}
+
+/* ==================== SIDEBAR RIGHT ==================== */
+#sidebar-right {
+  background: rgba(15, 17, 25, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-left: 1px solid var(--border); overflow-y: auto;
+  display: flex; flex-direction: column;
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+#warning-banner {
+  margin: 12px 14px 0; padding: 9px 11px; border-radius: 10px;
+  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+  display: none; flex-shrink: 0;
+}
+.warn-title { font-size: 0.72rem; font-weight: 700; color: var(--accent-warn); margin-bottom: 2px; }
+.warn-desc { font-size: 0.67rem; color: var(--text-soft); line-height: 1.4; }
+
+#upcoming-section { padding: 14px; border-bottom: 1px solid var(--border); }
+.upcoming-item {
+  padding: 9px; border-radius: 9px; background: var(--bg-glass); margin-bottom: 5px;
+  border-left: 3px solid var(--accent); cursor: pointer; transition: all 0.2s;
+}
+.upcoming-item:hover { background: var(--bg-glass-hover); }
+.upcoming-item .ui-title { font-size: 0.77rem; font-weight: 600; color: var(--text-main); }
+.upcoming-item .ui-time { font-size: 0.67rem; color: var(--text-muted); margin-top: 2px; }
+.upcoming-item .ui-tags { display: flex; gap: 3px; margin-top: 4px; flex-wrap: wrap; }
+.ui-tag {
+  font-size: 0.58rem; padding: 1px 5px; border-radius: 10px;
+  background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft);
+}
+
+#workload-section { padding: 14px; border-bottom: 1px solid var(--border); }
+.workload-bar { margin-bottom: 7px; }
+.wb-label { display: flex; justify-content: space-between; margin-bottom: 3px; }
+.wb-name { font-size: 0.68rem; color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.wb-val { font-size: 0.68rem; color: var(--text-muted); flex-shrink: 0; }
+.wb-track { background: var(--border); border-radius: 4px; height: 5px; overflow: hidden; }
+.wb-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+
+.insight-bars { display: flex; gap: 3px; align-items: flex-end; height: 36px; margin-top: 5px; }
+.insight-bar {
+  flex: 1; border-radius: 3px 3px 0 0; background: rgba(192,132,252,0.3);
+  min-height: 2px; transition: height 0.6s ease, background 0.3s;
+}
+.insight-bar:hover { background: rgba(192,132,252,0.55); }
+.insight-labels { display: flex; gap: 3px; }
+.il-label { flex: 1; text-align: center; font-size: 0.52rem; color: var(--text-muted); }
+
+#focus-session-panel { padding: 14px; }
+.focus-session-item {
+  padding: 7px 9px; border-radius: 8px; background: var(--bg-glass); margin-bottom: 4px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.fsi-name { font-size: 0.72rem; color: var(--text-soft); }
+.fsi-time { font-size: 0.68rem; color: var(--accent3); font-weight: 600; }
+
+/* ==================== AMBIENT MIXER PANEL ==================== */
+#ambient-panel {
+  position: fixed; top: calc(var(--topbar-h) + 8px); right: 16px; z-index: 60;
+  background: rgba(18,18,30,0.97); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px; width: 240px; box-shadow: var(--shadow);
+  display: none; backdrop-filter: blur(20px);
+}
+#ambient-panel.open { display: block; }
+.ambient-title { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+.ambient-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ambient-label { font-size: 0.72rem; color: var(--text-soft); width: 60px; flex-shrink: 0; }
+.ambient-vol { flex: 1; accent-color: var(--accent3); cursor: pointer; }
+.ambient-toggle {
+  background: none; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: 6px; padding: 2px 6px; cursor: pointer; font-size: 0.75rem;
+  transition: all 0.2s;
+}
+.ambient-toggle.on { background: rgba(52,211,153,0.15); border-color: var(--accent3); color: var(--accent3); }
+
+/* ==================== MODAL ==================== */
+#modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  padding: 16px;
+}
+#modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: rgba(18,18,30,0.98); border: 1px solid var(--border); border-radius: 18px;
+  padding: 24px; width: 100%; max-width: 460px; box-shadow: var(--shadow);
+  transform: translateY(12px); transition: transform 0.25s;
+  max-height: 90vh; overflow-y: auto;
+}
+#modal-overlay.open .modal-box { transform: translateY(0); }
+.modal-title {
+  font-size: 0.95rem; font-weight: 700; color: var(--text-main);
+  margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center;
+}
+.modal-close {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 1rem; transition: color 0.2s; padding: 2px;
+}
+.modal-close:hover { color: var(--text-main); }
+.form-row { margin-bottom: 13px; }
+.form-label {
+  font-size: 0.68rem; font-weight: 600; color: var(--text-muted);
+  letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; display: block;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%; background: var(--bg-glass); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-main); font-family: inherit; font-size: 0.8rem; padding: 7px 11px;
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-select option { background: #131326; }
+.form-textarea { resize: vertical; min-height: 55px; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 13px; }
+.color-picker { display: flex; gap: 7px; flex-wrap: wrap; }
+.color-swatch {
+  width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: border-color 0.15s, transform 0.15s;
+}
+.color-swatch:hover, .color-swatch.selected { border-color: white; transform: scale(1.2); }
+.recur-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+.recur-pill {
+  padding: 3px 9px; border-radius: 20px; border: 1px solid var(--border);
+  background: var(--bg-glass); cursor: pointer; font-size: 0.68rem; color: var(--text-soft);
+  transition: all 0.2s;
+}
+.recur-pill.selected { background: rgba(192,132,252,0.15); border-color: var(--accent); color: var(--accent); }
+.diff-selector { display: flex; gap: 6px; }
+.diff-opt {
+  flex: 1; padding: 5px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-glass); cursor: pointer; text-align: center; font-size: 0.68rem;
+  color: var(--text-soft); transition: all 0.2s;
+}
+.diff-opt.selected { border-color: var(--accent-warn); background: rgba(245,158,11,0.1); color: var(--accent-warn); }
+.check-row { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.check-row input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; }
+.check-row label { font-size: 0.75rem; color: var(--text-soft); cursor: pointer; }
+.modal-footer { display: flex; gap: 7px; justify-content: flex-end; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+.btn-cancel {
+  background: var(--bg-glass); border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 8px; padding: 7px 14px; cursor: pointer; font-family: inherit; transition: all 0.2s;
+  font-size: 0.8rem;
+}
+.btn-cancel:hover { border-color: var(--border-hover); }
+.btn-save {
+  background: var(--accent); border: none; color: white; border-radius: 8px;
+  padding: 7px 14px; cursor: pointer; font-family: inherit; font-weight: 600;
+  transition: opacity 0.2s; font-size: 0.8rem;
+}
+.btn-save:hover { opacity: 0.85; }
+
+/* ==================== FOCUS MODE OVERLAY ==================== */
+#app.focus-hidden { display: none; }
+#focus-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: none; align-items: center; justify-content: center;
+  background: linear-gradient(rgba(10, 12, 18, 0.2), rgba(10, 12, 18, 0.42));
+}
+#focus-overlay.active { display: flex; }
+#focus-card {
+  background: transparent; border: none; border-radius: 24px;
+  padding: 24px; text-align: center; max-width: 680px; width: 92%;
+  box-shadow: none;
+}
+#focus-pomo-time {
+  font-size: 7.5rem; font-weight: 700; color: #ffffff;
+  letter-spacing: 6px; font-family: var(--mono);
+  line-height: 1.05;
+  text-shadow: 0 4px 28px rgba(0,0,0,0.8), 0 1px 6px rgba(0,0,0,0.6);
+}
+#focus-pomo-label {
+  font-size: 1.15rem; font-weight: 600; color: #f1f5f9;
+  margin-top: 10px; margin-bottom: 28px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.85);
+}
+.focus-controls { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.focus-btn {
+  background: rgba(15, 17, 25, 0.72); border: 1px solid rgba(255,255,255,0.22);
+  color: #f8fafc; backdrop-filter: blur(10px);
+  border-radius: 10px; padding: 9px 18px; cursor: pointer; font-family: inherit;
+  font-size: 0.85rem; font-weight: 600; transition: all 0.2s;
+}
+.focus-btn:hover { border-color: var(--accent); color: #ffffff; background: rgba(15, 17, 25, 0.88); }
+.focus-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.focus-btn.primary:hover { opacity: 0.9; }
+
+.pomo-expand-btn {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  color: var(--text-soft); border-radius: 6px; padding: 1px 6px;
+  cursor: pointer; font-size: 0.7rem; transition: all 0.2s;
+}
+.pomo-expand-btn:hover { color: var(--accent); border-color: var(--accent); }
+#pomo-timer { cursor: pointer; transition: opacity 0.2s; }
+#pomo-timer:hover { opacity: 0.85; }
+
+/* ==================== TOAST ==================== */
+#toast-container {
+  position: fixed; top: calc(var(--topbar-h) + 10px); right: 14px;
+  z-index: 200; display: flex; flex-direction: column; gap: 7px;
+  pointer-events: none;
+}
+.toast {
+  background: rgba(18,18,30,0.96); border: 1px solid var(--border); border-radius: 11px;
+  padding: 10px 14px; min-width: 240px; max-width: 300px; box-shadow: var(--shadow);
+  animation: slideIn 0.3s ease; display: flex; align-items: flex-start; gap: 9px;
+  pointer-events: all;
+}
+.toast.removing { animation: slideOut 0.3s ease forwards; }
+.toast-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+.toast-title { font-size: 0.77rem; font-weight: 700; color: var(--text-main); }
+.toast-desc { font-size: 0.68rem; color: var(--text-muted); margin-top: 1px; }
+.toast.pomo   { border-color: var(--accent); }
+.toast.warn   { border-color: var(--accent-warn); }
+.toast.success { border-color: var(--accent3); }
+@keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(110%); opacity: 0; } }
+
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 1100px) {
+  :root { --sidebar-r: 240px; }
+}
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: 220px; --sidebar-r: 200px; }
+  #scene-group { display: none; }
+  #track-name { max-width: 80px; }
+}
+
+@media (max-width: 700px) {
+  :root { --sidebar-w: 100%; --sidebar-r: 100%; }
+
+  #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--topbar-h) 1fr;
+    overflow: auto;
+  }
+  /* Mobile: show panels as drawers via JS toggle */
+  #sidebar-left, #sidebar-right {
+    display: none; position: fixed; z-index: 30; top: var(--topbar-h); bottom: 0;
+    width: 85%; max-width: 320px; border: none;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  #sidebar-left { left: 0; border-right: 1px solid var(--border); }
+  #sidebar-right { right: 0; border-left: 1px solid var(--border); }
+  #sidebar-left.mobile-open, #sidebar-right.mobile-open { display: flex; }
+
+  #mobile-menu-btn { display: flex !important; }
+  #music-player { display: none; }
+  #track-name, #vol-slider { display: none; }
+  .scene-btn { display: none; }
+
+  #cal-header { gap: 5px; }
+  #cal-title { min-width: 100px; font-size: 0.8rem; }
+  .view-tab { padding: 3px 7px; font-size: 0.65rem; }
+  #topbar { gap: 6px; }
+  #topbar .logo span { display: none; }
+
+  /* Month view cells smaller */
+  .month-cell { min-height: 60px; padding: 3px; }
+  .mc-day { font-size: 0.65rem; }
+  .mc-ev-chip { font-size: 0.55rem; }
+}
+
+@media (max-width: 480px) {
+  #cal-header { flex-wrap: wrap; row-gap: 6px; }
+  .btn-new-event span { display: none; }
+  .btn-new-event { padding: 6px 10px; }
+}
+
+/* Mobile overlay backdrop */
+#mobile-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 25;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(2px);
+}
+#mobile-backdrop.open { display: block; }
+</style>
+</head>
+<body>
+
+<!-- Rain overlay for Rain scene -->
+<canvas id="rain-overlay"></canvas>
+<div id="mobile-backdrop" onclick="closeMobileDrawers()"></div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- Focus Mode Overlay -->
+<div id="focus-overlay">
+  <div id="focus-card">
+    <div id="focus-pomo-time">25:00</div>
+    <div id="focus-pomo-label">Tập trung • Phiên 1/4</div>
+    <div class="focus-controls">
+      <button class="focus-btn primary" id="focus-pause-btn" onclick="focusPauseResume()">▶ Bắt đầu</button>
+      <button class="focus-btn" onclick="resetPomodoro()">↺ Reset</button>
+      <button class="focus-btn" onclick="exitFocusMode()">✕ Thoát</button>
+    </div>
+  </div>
+</div>
+
+<!-- Event Modal -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span id="modal-title-text">✨ Thêm sự kiện</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Tiêu đề *</label>
+      <input class="form-input" id="ev-title" placeholder="VD: Học Toán, Nộp bài..." />
+    </div>
+    <div class="form-row-2">
+      <div>
+        <label class="form-label">Bắt đầu</label>
+        <input class="form-input" id="ev-start" type="time" />
+      </div>
+      <div>
+        <label class="form-label">Kết thúc</label>
+        <input class="form-input" id="ev-end" type="time" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Ngày</label>
+      <input class="form-input" id="ev-date" type="date" />
+    </div>
+    <div class="form-row">
+      <label class="form-label">Màu sắc</label>
+      <div class="color-picker" id="color-picker">
+        <div class="color-swatch selected" data-color="ev-purple" style="background:#c084fc" title="Tím"></div>
+        <div class="color-swatch" data-color="ev-blue"   style="background:#818cf8" title="Xanh dương"></div>
+        <div class="color-swatch" data-color="ev-green"  style="background:#34d399" title="Xanh lá"></div>
+        <div class="color-swatch" data-color="ev-amber"  style="background:#f59e0b" title="Vàng"></div>
+        <div class="color-swatch" data-color="ev-red"    style="background:#f87171" title="Đỏ"></div>
+        <div class="color-swatch" data-color="ev-teal"   style="background:#2dd4bf" title="Ngọc"></div>
+        <div class="color-swatch" data-color="ev-pink"   style="background:#ec4899" title="Hồng"></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Lặp lại</label>
+      <div class="recur-pills">
+        <div class="recur-pill selected" data-recur="none">Không lặp</div>
+        <div class="recur-pill" data-recur="daily">Hàng ngày</div>
+        <div class="recur-pill" data-recur="weekly">Hàng tuần</div>
+        <div class="recur-pill" data-recur="monthly">Hàng tháng</div>
+        <div class="recur-pill" data-recur="yearly">Hàng năm</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Mức độ khó</label>
+      <div class="diff-selector">
+        <div class="diff-opt selected" data-diff="0">😊 Dễ</div>
+        <div class="diff-opt" data-diff="2">😐 Vừa</div>
+        <div class="diff-opt" data-diff="4">😤 Khó</div>
+        <div class="diff-opt" data-diff="5">🔥 Rất khó</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Ghi chú / Vị trí</label>
+      <textarea class="form-textarea" id="ev-note" placeholder="Ghi chú, địa điểm..."></textarea>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="ev-pomodoro">
+      <label for="ev-pomodoro">🍅 Tự bật Pomodoro khi đến giờ</label>
+    </div>
+    <div class="check-row">
+      <input type="checkbox" id="ev-focus">
+      <label for="ev-focus">🔕 Bật chế độ tập trung (chặn thông báo)</label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="modal-delete-btn" style="color:var(--accent-danger);border-color:rgba(248,113,113,0.4);display:none" onclick="deleteCurrentEvent()">🗑 Xóa</button>
+      <button class="btn-cancel" onclick="closeModal()">Hủy</button>
+      <button class="btn-save" onclick="saveEvent()">💾 Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APP LAYOUT ==================== -->
+<div id="app">
+
+  <!-- TOPBAR -->
+  <div id="topbar">
+    <!-- Sidebar collapse toggle -->
+    <button id="sidebar-toggle" onclick="toggleSidebar()" title="Ẩn/hiện thanh bên">
+      <span class="arrow">‹</span>
+    </button>
+
+    <!-- Spotify Now Playing Widget (Discord-style) -->
+    <div id="spotify-widget" title="Trạng thái Spotify trên máy">
+      <div id="sp-art">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      </div>
+      <div id="sp-info">
+        <div id="sp-track-wrap"><span id="sp-track">Spotify đang tạm dừng</span></div>
+        <div id="sp-artist">Đang chờ phát nhạc</div>
+      </div>
+      <div class="sp-controls">
+        <button class="sp-ctrl-btn" onclick="sendSpotifyMedia('prev')" title="Bài trước">
+          <svg viewBox="0 0 16 16"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15l9.95-5.744a.7.7 0 0 1 1.05.606v12.575a.7.7 0 0 1-1.05.607L4 9.149V14.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg>
+        </button>
+        <button class="sp-ctrl-btn sp-play-btn" id="sp-playpause" onclick="sendSpotifyMedia('playpause')" title="Phát / Tạm dừng">
+          <svg viewBox="0 0 16 16"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
+        </button>
+        <button class="sp-ctrl-btn" onclick="sendSpotifyMedia('next')" title="Bài tiếp theo">
+          <svg viewBox="0 0 16 16"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.107A.7.7 0 0 0 1 1.712v12.575a.7.7 0 0 0 1.05.607L12 9.149V14.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="topbar-sep"></div>
+
+    <button class="nav-btn active" onclick="switchMainView('calendar')">📅 Lịch</button>
+
+    <div class="topbar-right">
+      <div id="clock-wrap">
+        <div id="clock-display">--:--:--</div>
+        <div id="date-display">Loading...</div>
+      </div>
+      <!-- Mobile sidebar toggles -->
+      <button id="mobile-menu-btn" onclick="toggleMobileLeft()" style="display:none" title="Menu">☰</button>
+    </div>
+  </div>
+
+  <!-- SIDEBAR LEFT -->
+  <div id="sidebar-left">
+    <!-- Mini Calendar -->
+    <div id="mini-cal">
+      <div class="mini-cal-header">
+        <button onclick="miniCalPrev()">‹</button>
+        <h3 id="mini-cal-title">Tháng 11, 2026</h3>
+        <button onclick="miniCalNext()">›</button>
+      </div>
+      <div class="mini-cal-grid" id="mini-cal-grid"></div>
+    </div>
+
+    <!-- Tasks -->
+    <div id="task-panel">
+      <div class="panel-title">📋 Việc cần làm <span class="badge" id="task-badge">0</span></div>
+      <div class="task-input-row">
+        <input class="task-input" id="task-input" placeholder="Thêm việc cần làm..." onkeydown="if(event.key==='Enter')addTask()">
+        <button class="btn-add-task" onclick="addTask()">+</button>
+      </div>
+      <div id="task-list"></div>
+    </div>
+
+    <!-- Pomodoro -->
+    <div id="pomodoro-panel">
+      <div class="panel-title">🍅 Pomodoro <button class="pomo-expand-btn" onclick="enterFocusMode()" title="Phóng to toàn màn hình">⛶</button></div>
+      <div class="pomo-display">
+        <div id="pomo-timer" onclick="enterFocusMode()" title="Click để bật chế độ tập trung toàn màn hình">25:00</div>
+        <div id="pomo-label">Sẵn sàng tập trung</div>
+      </div>
+      <div class="pomo-progress">
+        <div class="pomo-progress-bar" id="pomo-bar" style="width:100%"></div>
+      </div>
+      <div class="pomo-controls">
+        <button class="pomo-btn primary" id="pomo-start-btn" onclick="startPomodoro()">▶ Bắt đầu</button>
+        <button class="pomo-btn" onclick="resetPomodoro()">↺ Reset</button>
+        <button class="pomo-btn" onclick="skipPomodoro()">⏭ Skip</button>
+      </div>
+      <div class="pomo-sessions" id="pomo-sessions">⬜⬜⬜⬜</div>
+    </div>
+
+    <!-- Today stats -->
+    <div id="focus-stats">
+      <div class="panel-title">⏱ Hôm nay</div>
+      <div class="stat-row"><span class="stat-label">Đã tập trung</span><span class="stat-val" id="stat-focused">0h 0m</span></div>
+      <div class="stat-row"><span class="stat-label">Pomodoro hoàn thành</span><span class="stat-val" id="stat-pomos">0</span></div>
+      <div class="stat-row"><span class="stat-label">Tải lịch học</span><span class="stat-val" id="stat-load">🟢 Nhẹ</span></div>
+    </div>
+  </div>
+
+  <!-- MAIN CALENDAR -->
+  <div id="main-area">
+    <div id="cal-header">
+      <button class="cal-nav-btn" onclick="navCalendar(-1)">‹</button>
+      <button class="cal-nav-btn" onclick="navCalendar(1)">›</button>
+      <button class="cal-nav-btn" onclick="goToday()">Hôm nay</button>
+      <span id="cal-title"></span>
+      <div class="view-tabs">
+        <button class="view-tab active" data-view="week" onclick="setView('week')">Tuần</button>
+        <button class="view-tab" data-view="day" onclick="setView('day')">Ngày</button>
+        <button class="view-tab" data-view="month" onclick="setView('month')">Tháng</button>
+      </div>
+      <button class="btn-new-event" onclick="openModal()">+ <span>Sự kiện</span></button>
+      <!-- Mobile right sidebar toggle -->
+      <button class="cal-nav-btn" id="mobile-right-btn" style="display:none" onclick="toggleMobileRight()">📊</button>
+    </div>
+    <div id="calendar-container"></div>
+  </div>
+
+  <!-- SIDEBAR RIGHT -->
+  <div id="sidebar-right">
+    <div id="warning-banner">
+      <div class="warn-title">⚠️ Cảnh báo quá tải</div>
+      <div class="warn-desc" id="warning-desc"></div>
+    </div>
+    <div id="upcoming-section" style="padding-top:14px">
+      <div class="panel-title">🔔 Sắp tới</div>
+      <div id="upcoming-list"></div>
+    </div>
+    <div id="workload-section">
+      <div class="panel-title">📈 Khối lượng hôm nay</div>
+      <div id="workload-bars"></div>
+      <div style="margin-top:10px">
+        <div class="panel-title" style="margin-bottom:4px">📊 7 ngày gần đây</div>
+        <div class="insight-bars" id="insight-bars"></div>
+        <div class="insight-labels" id="insight-labels"></div>
+      </div>
+    </div>
+    <div id="focus-session-panel">
+      <div class="panel-title">🎯 Khung tập trung</div>
+      <div id="focus-session-list"></div>
+      <button class="pomo-btn" style="width:100%;margin-top:8px;text-align:center" onclick="startFocusBlock()">+ Thêm khung tập trung</button>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<script>
+'use strict';
+/* =====================================================
+   AUDIO ENGINE — 100% Web Audio API, zero local files
+   ===================================================== */
+let AudioCtx = null;
+
+function getAudioCtx() {
+  if (!AudioCtx) {
+    AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return AudioCtx;
+}
+
+/* ---------- Lo-fi Music Synthesizer ---------- */
+// Generates a procedural lo-fi / chill beat using oscillators,
+// filtered noise and an LFO — no MP3 needed.
+const Music = {
+  masterGain: null,
+  playing: false,
+  trackIndex: 0,
+  loopTimeout: null,
+  nodes: [],
+};
+
+const TRACKS = [
+  { name: '☁️ Cloudy Day Lo-fi',  bpm: 70,  key: 220 },
+  { name: '🌙 Midnight Study',     bpm: 65,  key: 196 },
+  { name: '🌧 Rainy Café',         bpm: 80,  key: 246 },
+  { name: '🌿 Forest Beats',       bpm: 72,  key: 174 },
+  { name: '🎹 Piano Chill',        bpm: 60,  key: 261 },
+];
+
+function stopAllMusicNodes() {
+  Music.nodes.forEach(n => { try { n.stop(); } catch(e) {} });
+  Music.nodes = [];
+  if (Music.loopTimeout) clearTimeout(Music.loopTimeout);
+}
+
+function playLofiPattern(bpm, rootHz) {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  stopAllMusicNodes();
+
+  const master = ctx.createGain();
+  master.gain.value = Music.masterGain ? Music.masterGain.gain.value : 0.4;
+  master.connect(ctx.destination);
+  Music.masterGain = master;
+
+  // Lo-fi vinyl LPF (low-pass filter)
+  const lpf = ctx.createBiquadFilter();
+  lpf.type = 'lowpass';
+  lpf.frequency.value = 3400;
+  lpf.Q.value = 0.8;
+  lpf.connect(master);
+
+  // Slight warm overdrive
+  const waveShaper = ctx.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = (Math.PI + 60) * x / (Math.PI + 60 * Math.abs(x));
+  }
+  waveShaper.curve = curve;
+  waveShaper.connect(lpf);
+
+  const beat = 60 / bpm;
+  const now = ctx.currentTime;
+
+  // --- Chord pads ---
+  const chords = [
+    [rootHz, rootHz * 1.189, rootHz * 1.498],              // minor chord
+    [rootHz * 0.891, rootHz * 1.059, rootHz * 1.335],      // iv
+    [rootHz * 1.122, rootHz * 1.335, rootHz * 1.587],      // v
+    [rootHz * 0.794, rootHz * 0.945, rootHz * 1.189],      // bVII
+  ];
+
+  for (let bar = 0; bar < 8; bar++) {
+    const chord = chords[bar % chords.length];
+    chord.forEach(freq => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.value = freq / 2; // octave down
+      env.gain.setValueAtTime(0, now + bar * beat * 4);
+      env.gain.linearRampToValueAtTime(0.055, now + bar * beat * 4 + 0.08);
+      env.gain.linearRampToValueAtTime(0.04, now + bar * beat * 4 + 1.5);
+      env.gain.linearRampToValueAtTime(0, now + bar * beat * 4 + beat * 4 + 0.1);
+      osc.connect(env); env.connect(waveShaper);
+      osc.start(now + bar * beat * 4);
+      osc.stop(now + bar * beat * 4 + beat * 4 + 0.2);
+      Music.nodes.push(osc);
+    });
+  }
+
+  // --- Kick drum (sine thump) ---
+  for (let i = 0; i < 8 * 4; i++) {
+    if (i % 4 === 0 || i % 4 === 2) {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(80, now + i * beat);
+      osc.frequency.exponentialRampToValueAtTime(30, now + i * beat + 0.08);
+      env.gain.setValueAtTime(0.6, now + i * beat);
+      env.gain.exponentialRampToValueAtTime(0.001, now + i * beat + 0.18);
+      osc.connect(env); env.connect(master);
+      osc.start(now + i * beat); osc.stop(now + i * beat + 0.25);
+      Music.nodes.push(osc);
+    }
+  }
+
+  // --- Hi-hat (filtered noise) ---
+  const totalBeats = 8 * 4;
+  for (let i = 0; i < totalBeats * 2; i++) {
+    const bufSz = ctx.sampleRate * 0.05;
+    const buf = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let j = 0; j < bufSz; j++) data[j] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const hhf = ctx.createBiquadFilter();
+    hhf.type = 'highpass'; hhf.frequency.value = 8000;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(i % 2 === 0 ? 0.1 : 0.05, now + i * beat * 0.5);
+    env.gain.exponentialRampToValueAtTime(0.001, now + i * beat * 0.5 + 0.04);
+    src.connect(hhf); hhf.connect(env); env.connect(master);
+    src.start(now + i * beat * 0.5); src.stop(now + i * beat * 0.5 + 0.06);
+    Music.nodes.push(src);
+  }
+
+  // --- Melody (simple pentatonic) ---
+  const penta = [0, 2, 3, 5, 7, 9].map(s => rootHz * Math.pow(2, s / 12));
+  const melPat = [0, 2, 1, 3, 2, 4, 3, 1, 0, 2, 4, 3, 1, 2, 0, 4];
+  melPat.forEach((noteIdx, i) => {
+    if (Math.random() > 0.5) return;
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = penta[noteIdx] * 2;
+    const t = now + i * beat * 0.5;
+    env.gain.setValueAtTime(0, t);
+    env.gain.linearRampToValueAtTime(0.07, t + 0.04);
+    env.gain.linearRampToValueAtTime(0, t + beat * 0.45);
+    osc.connect(env); env.connect(waveShaper);
+    osc.start(t); osc.stop(t + beat * 0.5);
+    Music.nodes.push(osc);
+  });
+
+  // Loop after 8 bars
+  const loopDur = beat * 4 * 8;
+  Music.loopTimeout = setTimeout(() => {
+    if (Music.playing) playLofiPattern(bpm, rootHz);
+  }, loopDur * 1000);
+}
+
+function togglePlay() {
+  Music.playing = !Music.playing;
+  if (Music.playing) {
+    const t = TRACKS[Music.trackIndex];
+    playLofiPattern(t.bpm, t.key);
+    document.getElementById('play-btn').textContent = '⏸';
+    document.getElementById('vinyl').classList.remove('paused');
+    document.getElementById('track-name').textContent = t.name;
+  } else {
+    stopAllMusicNodes();
+    document.getElementById('play-btn').textContent = '▶';
+    document.getElementById('vinyl').classList.add('paused');
+  }
+}
+
+function nextTrack() {
+  Music.trackIndex = (Music.trackIndex + 1) % TRACKS.length;
+  if (Music.playing) { const t=TRACKS[Music.trackIndex]; playLofiPattern(t.bpm,t.key); }
+  document.getElementById('track-name').textContent = TRACKS[Music.trackIndex].name;
+}
+function prevTrack() {
+  Music.trackIndex = (Music.trackIndex - 1 + TRACKS.length) % TRACKS.length;
+  if (Music.playing) { const t=TRACKS[Music.trackIndex]; playLofiPattern(t.bpm,t.key); }
+  document.getElementById('track-name').textContent = TRACKS[Music.trackIndex].name;
+}
+function setVolume(v) {
+  if (Music.masterGain) Music.masterGain.gain.value = v / 100;
+}
+
+/* ---------- Ambient Sound Engine (Web Audio API noise synthesis) ---------- */
+const Ambient = {
+  nodes: {},
+  gains: {},
+};
+
+const AMBIENT_TYPES = {
+  rain: () => makeFilteredNoise(400, 'bandpass', 1.5, 0.3),
+  wave: () => makeLFONoise(0.08, 600, 'lowpass'),
+  fire: () => makeFilteredNoise(300, 'lowpass', 0.5, 0.25),
+  cafe: () => makeBabbleNoise(),
+  forest: () => makeForestNoise(),
+};
+
+function makeFilteredNoise(freq, type, q, vol) {
+  const ctx = getAudioCtx();
+  const bufSz = ctx.sampleRate * 2;
+  const buf = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = freq; flt.Q.value = q;
+  const gain = ctx.createGain(); gain.gain.value = 0;
+  src.connect(flt); flt.connect(gain); gain.connect(ctx.destination);
+  src.start();
+  return { src, gain };
+}
+
+function makeLFONoise(rate, freq, type) {
+  const ctx = getAudioCtx();
+  const bufSz = ctx.sampleRate * 2;
+  const buf = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufSz; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const flt = ctx.createBiquadFilter(); flt.type = type; flt.frequency.value = freq;
+  const lfo = ctx.createOscillator(); lfo.frequency.value = rate;
+  const lfoGain = ctx.createGain(); lfoGain.gain.value = freq * 0.3;
+  lfo.connect(lfoGain); lfoGain.connect(flt.frequency);
+  const gain = ctx.createGain(); gain.gain.value = 0;
+  src.connect(flt); flt.connect(gain); gain.connect(ctx.destination);
+  src.start(); lfo.start();
+  return { src, gain, lfo };
+}
+
+function makeBabbleNoise() {
+  const ctx = getAudioCtx();
+  const bufSz = ctx.sampleRate * 2;
+  const buf = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  // Brown noise approximation for cafe ambience
+  let last = 0;
+  for (let i = 0; i < bufSz; i++) {
+    const w = (Math.random() * 2 - 1) * 0.02;
+    last = Math.max(-1, Math.min(1, last + w));
+    d[i] = last;
+  }
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const flt = ctx.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = 800; flt.Q.value = 0.3;
+  const gain = ctx.createGain(); gain.gain.value = 0;
+  src.connect(flt); flt.connect(gain); gain.connect(ctx.destination);
+  src.start();
+  return { src, gain };
+}
+
+function makeForestNoise() {
+  const ctx = getAudioCtx();
+  const bufSz = ctx.sampleRate * 3;
+  const buf = ctx.createBuffer(1, bufSz, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufSz; i++) d[i] = (Math.random() * 2 - 1) * 0.5;
+  const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+  const flt = ctx.createBiquadFilter(); flt.type = 'bandpass'; flt.frequency.value = 1200; flt.Q.value = 2;
+  const gain = ctx.createGain(); gain.gain.value = 0;
+  src.connect(flt); flt.connect(gain); gain.connect(ctx.destination);
+  src.start();
+  return { src, gain };
+}
+
+function initAmbient(name) {
+  if (!Ambient.nodes[name]) {
+    const node = AMBIENT_TYPES[name]();
+    Ambient.nodes[name] = node;
+    Ambient.gains[name] = node.gain;
+  }
+  return Ambient.gains[name];
+}
+
+function setAmbient(name, v) {
+  const g = initAmbient(name);
+  g.gain.value = v / 100 * 0.5;
+}
+
+function toggleAmbient(name) {
+  const g = initAmbient(name);
+  const btn = document.getElementById('amb-' + name + '-btn');
+  const slider = document.getElementById('amb-' + name);
+  if (g.gain.value > 0) {
+    g.gain.value = 0; slider.value = 0;
+    btn.textContent = 'OFF'; btn.classList.remove('on');
+  } else {
+    g.gain.value = 0.3; slider.value = 60;
+    btn.textContent = 'ON'; btn.classList.add('on');
+  }
+}
+
+/* =====================================================
+   RAIN OVERLAY & SCENE ACCENT
+   ===================================================== */
+const rainCanvas = document.getElementById('rain-overlay');
+const rainCtx    = rainCanvas.getContext('2d');
+let raindrops = [], animReq;
+
+function resizeCanvases() {
+  rainCanvas.width  = window.innerWidth;
+  rainCanvas.height = window.innerHeight;
+  raindrops = Array.from({length: 130}, () => ({
+    x: Math.random() * rainCanvas.width,
+    y: Math.random() * rainCanvas.height,
+    len: Math.random() * 18 + 8,
+    speed: Math.random() * 4 + 3,
+    alpha: Math.random() * 0.25 + 0.08,
+  }));
+}
+
+const SCENE_CFG = {
+  night:  { accent: '#c084fc' },
+  rain:   { accent: '#818cf8' },
+  forest: { accent: '#34d399' },
+  cafe:   { accent: '#f59e0b' },
+};
+
+let currentScene = 'night';
+
+function drawBackground() {
+  const targetRainOpacity = currentScene === 'rain' ? 0.85 : 0;
+  const curOpacity = parseFloat(rainCanvas.style.opacity || '0');
+  rainCanvas.style.opacity = curOpacity + (targetRainOpacity - curOpacity) * 0.05;
+
+  if (currentScene === 'rain') {
+    rainCtx.clearRect(0, 0, rainCanvas.width, rainCanvas.height);
+    raindrops.forEach(d => {
+      d.y += d.speed; d.x += 0.4;
+      if (d.y > rainCanvas.height) { d.y = 0; d.x = Math.random()*rainCanvas.width; }
+      rainCtx.beginPath();
+      rainCtx.moveTo(d.x, d.y);
+      rainCtx.lineTo(d.x - d.len*0.14, d.y + d.len);
+      rainCtx.strokeStyle = `rgba(180,210,255,${d.alpha})`;
+      rainCtx.lineWidth = 0.75; rainCtx.stroke();
+    });
+  }
+  animReq = requestAnimationFrame(drawBackground);
+}
+
+function setScene(s) {
+  currentScene = s;
+  document.querySelectorAll('.scene-btn').forEach(b => b.classList.toggle('active', b.id==='scene-'+s));
+  document.documentElement.style.setProperty('--accent', SCENE_CFG[s].accent);
+}
+
+/* =====================================================
+   STATE
+   ===================================================== */
+const State = {
+  now: new Date(),
+  viewDate: new Date(),
+  view: 'week',
+  events: [],
+  tasks: [],
+  editingEventId: null,
+  selectedColor: 'ev-purple',
+  selectedRecur: 'none',
+  selectedDiff: 0,
+  pomodoro: {
+    running: false, paused: false,
+    phase: 'focus',
+    seconds: 25*60, totalSeconds: 25*60,
+    session: 0, completedToday: 0, focusMinutesToday: 0,
+    interval: null,
+  },
+  miniCalDate: new Date(),
+  focusSessions: [],
+  focusModeActive: false,
+};
+
+/* =====================================================
+   STORAGE
+   ===================================================== */
+function saveToStorage() {
+  try {
+    localStorage.setItem('ls_events',  JSON.stringify(State.events));
+    localStorage.setItem('ls_tasks',   JSON.stringify(State.tasks));
+    localStorage.setItem('ls_focus',   JSON.stringify(State.focusSessions));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    State.events        = JSON.parse(localStorage.getItem('ls_events')  || '[]');
+    State.tasks         = JSON.parse(localStorage.getItem('ls_tasks')   || '[]');
+    State.focusSessions = JSON.parse(localStorage.getItem('ls_focus')   || '[]');
+  } catch(e) {
+    State.events=[]; State.tasks=[]; State.focusSessions=[];
+  }
+}
+
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+function fmtDate(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+function getEventsForDate(dateStr) {
+  return State.events.filter(e => {
+    if (e.date === dateStr) return true;
+    if (e.recur === 'daily') return true;
+    if (e.recur === 'weekly') {
+      const eD = new Date(e.date+'T00:00:00'), tD = new Date(dateStr+'T00:00:00');
+      return eD.getDay()===tD.getDay() && tD>=eD;
+    }
+    if (e.recur === 'monthly') {
+      const eD=new Date(e.date+'T00:00:00'),tD=new Date(dateStr+'T00:00:00');
+      return eD.getDate()===tD.getDate()&&tD>=eD;
+    }
+    if (e.recur === 'yearly') {
+      const eD=new Date(e.date+'T00:00:00'),tD=new Date(dateStr+'T00:00:00');
+      return eD.getDate()===tD.getDate()&&eD.getMonth()===tD.getMonth()&&tD>=eD;
+    }
+    return false;
+  });
+}
+
+/* =====================================================
+   CLOCK
+   ===================================================== */
+const DOW_VI   = ['Chủ Nhật','Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7'];
+const MONTH_VI = ['Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
+const DOW_SHORT = ['CN','T2','T3','T4','T5','T6','T7'];
+
+let triggeredEvents = new Set();
+
+function updateClock() {
+  const now = new Date();
+  State.now = now;
+  const h=String(now.getHours()).padStart(2,'0');
+  const m=String(now.getMinutes()).padStart(2,'0');
+  const s=String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('clock-display').textContent=`${h}:${m}:${s}`;
+  document.getElementById('date-display').textContent=`${DOW_VI[now.getDay()]}, ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
+  if (now.getSeconds()===0) { renderCalendar(); }
+  checkTriggers(now);
+}
+
+function checkTriggers(now) {
+  const dateStr = fmtDate(now);
+  const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if (now.getSeconds()!==0) return;
+  getEventsForDate(dateStr).forEach(ev => {
+    const key5 = ev.id+dateStr+'_r5';
+    const keyOn = ev.id+dateStr+'_on';
+    // 5-min reminder
+    const [eh,em] = ev.start.split(':').map(Number);
+    const evMins = eh*60+em;
+    const nowMins = now.getHours()*60+now.getMinutes();
+    if (nowMins===evMins-5 && !triggeredEvents.has(key5)) {
+      triggeredEvents.add(key5);
+      showToast('⏰','Nhắc nhở',`"${ev.title}" bắt đầu sau 5 phút!`,'warn');
+    }
+    // On-time
+    if (ev.start===timeStr && !triggeredEvents.has(keyOn)) {
+      triggeredEvents.add(keyOn);
+      showToast('🔔',ev.title,`Đến giờ! ${ev.start}–${ev.end}`,'pomo');
+      if ((ev.pomodoro||ev.focus) && confirm(`⏰ "${ev.title}" bắt đầu!\n\nBật chế độ tập trung Pomodoro?`)) {
+        enterFocusMode(ev.title);
+      }
+    }
+  });
+}
+
+/* =====================================================
+   CALENDAR RENDER
+   ===================================================== */
+const HOUR_H = 60; // px per hour
+const HOURS  = Array.from({length:24},(_,i)=>i);
+
+function setView(v) {
+  State.view = v;
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.toggle('active', t.dataset.view===v));
+  renderCalendar();
+}
+
+function navCalendar(dir) {
+  const d = State.viewDate;
+  if (State.view==='week')       d.setDate(d.getDate()+dir*7);
+  else if (State.view==='day')   d.setDate(d.getDate()+dir);
+  else                           d.setMonth(d.getMonth()+dir);
+  renderCalendar(); updateWorkload();
+}
+
+function goToday() { State.viewDate=new Date(); renderCalendar(); updateWorkload(); renderMiniCal(); }
+
+function getWeekMon(d) {
+  const r=new Date(d); r.setDate(d.getDate()-((d.getDay()+6)%7)); return r;
+}
+
+function renderCalendar() {
+  const c = document.getElementById('calendar-container');
+  c.innerHTML=''; c.style.display='flex'; c.style.flexDirection='column';
+  if (State.view==='week')       renderWeekView(c);
+  else if (State.view==='day')   renderDayView(c);
+  else                           renderMonthView(c);
+  updateCalTitle(); updateUpcoming();
+}
+
+function updateCalTitle() {
+  const d=State.viewDate;
+  let txt='';
+  if (State.view==='week') {
+    const ws=getWeekMon(d), we=new Date(ws); we.setDate(ws.getDate()+6);
+    txt=`${ws.getDate()}/${ws.getMonth()+1} – ${we.getDate()}/${we.getMonth()+1}/${we.getFullYear()}`;
+  } else if (State.view==='day') {
+    txt=`${DOW_VI[d.getDay()]}, ${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  } else {
+    txt=`${MONTH_VI[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  document.getElementById('cal-title').textContent=txt;
+}
+
+function renderWeekView(c) {
+  const ws=getWeekMon(State.viewDate);
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(ws.getDate()+i);return d;});
+  const totalH=HOUR_H*24;
+  // Header
+  const hdr=document.createElement('div'); hdr.className='week-header';
+  hdr.style.display='grid'; hdr.style.gridTemplateColumns='50px repeat(7,1fr)';
+  hdr.innerHTML='<div class="time-col-header"></div>'+days.map(d=>{
+    const isT=fmtDate(d)===fmtDate(State.now);
+    return `<div class="week-header-cell"><div class="wh-dow">${DOW_SHORT[d.getDay()]}</div><div class="wh-day${isT?' today':''}">${d.getDate()}</div></div>`;
+  }).join('');
+  c.appendChild(hdr);
+  // Body
+  const body=document.createElement('div');
+  body.className='week-body';
+  body.style.cssText=`flex:1;overflow-y:auto;display:grid;grid-template-columns:50px repeat(7,1fr);`;
+  // Time col
+  const tc=document.createElement('div'); tc.className='time-col'; tc.style.height=totalH+'px';
+  HOURS.forEach(h=>{
+    if(h===0)return;
+    const lbl=document.createElement('div'); lbl.className='time-label';
+    lbl.style.top=(h*HOUR_H)+'px'; lbl.textContent=`${String(h).padStart(2,'0')}:00`;
+    tc.appendChild(lbl);
+  });
+  body.appendChild(tc);
+  // Day cols
+  days.forEach(day=>{
+    const dStr=fmtDate(day);
+    const col=document.createElement('div'); col.className='day-col'; col.style.height=totalH+'px';
+    HOURS.forEach(h=>{
+      const hl=document.createElement('div'); hl.className='hour-line'; hl.style.top=(h*HOUR_H)+'px'; col.appendChild(hl);
+      const hal=document.createElement('div'); hal.className='half-line'; hal.style.top=(h*HOUR_H+30)+'px'; col.appendChild(hal);
+    });
+    if(fmtDate(day)===fmtDate(State.now)){
+      const nl=document.createElement('div'); nl.className='now-line';
+      nl.style.top=((State.now.getHours()*60+State.now.getMinutes())/60*HOUR_H)+'px'; col.appendChild(nl);
+    }
+    getEventsForDate(dStr).forEach(ev=>col.appendChild(mkChip(ev,dStr)));
+    col.addEventListener('click',e=>{
+      if(e.target.closest('.event-chip'))return;
+      const r=col.getBoundingClientRect(), y=e.clientY-r.top;
+      const hh=Math.max(0,Math.min(23,Math.floor(y/HOUR_H)));
+      const mm=Math.round((y%HOUR_H)/HOUR_H*2)*30;
+      openModal(null,dStr,`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+    });
+    body.appendChild(col);
+  });
+  c.appendChild(body);
+  setTimeout(()=>{ body.scrollTop=7*HOUR_H; },40);
+}
+
+function renderDayView(c) {
+  const dStr=fmtDate(State.viewDate), totalH=HOUR_H*24;
+  const body=document.createElement('div');
+  body.style.cssText='flex:1;overflow-y:auto;display:grid;grid-template-columns:50px 1fr;';
+  const tc=document.createElement('div'); tc.className='time-col'; tc.style.height=totalH+'px';
+  HOURS.forEach(h=>{
+    if(h===0)return;
+    const lbl=document.createElement('div'); lbl.className='time-label'; lbl.style.top=(h*HOUR_H)+'px';
+    lbl.textContent=`${String(h).padStart(2,'0')}:00`; tc.appendChild(lbl);
+  });
+  body.appendChild(tc);
+  const col=document.createElement('div'); col.className='day-col'; col.style.height=totalH+'px';
+  HOURS.forEach(h=>{
+    const hl=document.createElement('div'); hl.className='hour-line'; hl.style.top=(h*HOUR_H)+'px'; col.appendChild(hl);
+    const hal=document.createElement('div'); hal.className='half-line'; hal.style.top=(h*HOUR_H+30)+'px'; col.appendChild(hal);
+  });
+  if(dStr===fmtDate(State.now)){
+    const nl=document.createElement('div'); nl.className='now-line';
+    nl.style.top=((State.now.getHours()*60+State.now.getMinutes())/60*HOUR_H)+'px'; col.appendChild(nl);
+  }
+  getEventsForDate(dStr).forEach(ev=>col.appendChild(mkChip(ev,dStr)));
+  col.addEventListener('click',e=>{
+    if(e.target.closest('.event-chip'))return;
+    const r=col.getBoundingClientRect(), y=e.clientY-r.top;
+    const hh=Math.max(0,Math.min(23,Math.floor(y/HOUR_H)));
+    const mm=Math.round((y%HOUR_H)/HOUR_H*2)*30;
+    openModal(null,dStr,`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+  });
+  body.appendChild(col); c.appendChild(body);
+  setTimeout(()=>{ body.scrollTop=7*HOUR_H; },40);
+}
+
+function renderMonthView(c) {
+  c.style.display='block'; c.style.overflowY='auto';
+  const y=State.viewDate.getFullYear(), mo=State.viewDate.getMonth();
+  const firstDay=new Date(y,mo,1), lastDay=new Date(y,mo+1,0);
+  const startDow=(firstDay.getDay()+6)%7;
+  const grid=document.createElement('div'); grid.className='month-grid';
+  ['T2','T3','T4','T5','T6','T7','CN'].forEach(d=>{
+    const h=document.createElement('div');
+    h.style.cssText='background:rgba(13,13,20,0.9);padding:5px 3px;text-align:center;font-size:0.6rem;color:var(--text-muted);font-weight:600;';
+    h.textContent=d; grid.appendChild(h);
+  });
+  for(let i=0;i<startDow;i++){
+    const pd=new Date(y,mo,1-startDow+i);
+    const cell=document.createElement('div'); cell.className='month-cell other-month';
+    cell.innerHTML=`<div class="mc-day">${pd.getDate()}</div>`; grid.appendChild(cell);
+  }
+  for(let d=1;d<=lastDay.getDate();d++){
+    const date=new Date(y,mo,d), dStr=fmtDate(date);
+    const isT=dStr===fmtDate(State.now);
+    const cell=document.createElement('div'); cell.className='month-cell'+(isT?' today':'');
+    const evs=getEventsForDate(dStr).slice(0,3);
+    cell.innerHTML=`<div class="mc-day">${d}</div><div class="mc-events">${evs.map(e=>`<div class="mc-ev-chip ${e.color}">${e.title}</div>`).join('')}</div>`;
+    cell.addEventListener('click',()=>{ State.viewDate=new Date(date); setView('day'); });
+    grid.appendChild(cell);
+  }
+  const rem=(7-(startDow+lastDay.getDate())%7)%7;
+  for(let i=1;i<=rem;i++){
+    const cell=document.createElement('div'); cell.className='month-cell other-month';
+    cell.innerHTML=`<div class="mc-day">${i}</div>`; grid.appendChild(cell);
+  }
+  c.appendChild(grid);
+}
+
+function mkChip(ev, dateStr) {
+  const chip=document.createElement('div'); chip.className=`event-chip ${ev.color}`;
+  const [sh,sm]=ev.start.split(':').map(Number);
+  const [eh,em]=ev.end.split(':').map(Number);
+  const topPx=(sh*60+sm)/60*HOUR_H;
+  const hPx=Math.max(((eh*60+em)-(sh*60+sm))/60*HOUR_H-2,18);
+  chip.style.top=topPx+'px'; chip.style.height=hPx+'px';
+  const icons=(ev.pomodoro?'🍅':'')+(ev.focus?'🔕':'')+(ev.recur!=='none'?'🔁':'');
+  chip.innerHTML=`<div class="ec-title">${ev.title}${icons?` ${icons}`:''}</div><div class="ec-time">${ev.start}–${ev.end}</div>`;
+  chip.title=ev.note||ev.title;
+  chip.addEventListener('click',e=>{ e.stopPropagation(); openModal(ev.id); });
+  return chip;
+}
+
+/* =====================================================
+   MINI CALENDAR
+   ===================================================== */
+function renderMiniCal() {
+  const d=State.miniCalDate, y=d.getFullYear(), mo=d.getMonth();
+  document.getElementById('mini-cal-title').textContent=`${MONTH_VI[mo]} ${y}`;
+  const grid=document.getElementById('mini-cal-grid'); grid.innerHTML='';
+  ['T2','T3','T4','T5','T6','T7','CN'].forEach(dw=>{
+    const el=document.createElement('div'); el.className='mini-cal-dow'; el.textContent=dw; grid.appendChild(el);
+  });
+  const firstDay=new Date(y,mo,1), lastDay=new Date(y,mo+1,0);
+  const startDow=(firstDay.getDay()+6)%7;
+  for(let i=0;i<startDow;i++){
+    const el=document.createElement('div'); el.className='mini-cal-day other-month';
+    el.textContent=new Date(y,mo,1-startDow+i).getDate(); grid.appendChild(el);
+  }
+  for(let day=1;day<=lastDay.getDate();day++){
+    const date=new Date(y,mo,day), dStr=fmtDate(date);
+    const isT=dStr===fmtDate(State.now), isSel=dStr===fmtDate(State.viewDate);
+    const el=document.createElement('div');
+    el.className='mini-cal-day'+(isT?' today':'')+(isSel&&!isT?' selected':'');
+    el.textContent=day;
+    if(getEventsForDate(dStr).length>0) el.classList.add('has-event');
+    el.addEventListener('click',()=>{ State.viewDate=new Date(date); renderCalendar(); renderMiniCal(); updateWorkload(); });
+    grid.appendChild(el);
+  }
+  const rem=(7-(startDow+lastDay.getDate())%7)%7;
+  for(let i=1;i<=rem;i++){
+    const el=document.createElement('div'); el.className='mini-cal-day other-month'; el.textContent=i; grid.appendChild(el);
+  }
+}
+function miniCalPrev(){ State.miniCalDate.setMonth(State.miniCalDate.getMonth()-1); renderMiniCal(); }
+function miniCalNext(){ State.miniCalDate.setMonth(State.miniCalDate.getMonth()+1); renderMiniCal(); }
+
+/* =====================================================
+   MODAL
+   ===================================================== */
+function openModal(eventId=null, dateStr=null, timeStr=null) {
+  State.editingEventId=eventId;
+  document.getElementById('modal-title-text').textContent=eventId?'✏️ Chỉnh sửa sự kiện':'✨ Thêm sự kiện';
+  document.getElementById('modal-delete-btn').style.display=eventId?'':'none';
+  if(eventId){
+    const ev=State.events.find(e=>e.id===eventId); if(!ev)return;
+    document.getElementById('ev-title').value=ev.title;
+    document.getElementById('ev-start').value=ev.start;
+    document.getElementById('ev-end').value=ev.end;
+    document.getElementById('ev-date').value=ev.date;
+    document.getElementById('ev-note').value=ev.note||'';
+    document.getElementById('ev-pomodoro').checked=ev.pomodoro||false;
+    document.getElementById('ev-focus').checked=ev.focus||false;
+    setMColor(ev.color); setMRecur(ev.recur); setMDiff(ev.diff);
+  } else {
+    document.getElementById('ev-title').value='';
+    // Fix end time calculation: parse hours properly
+    let endStr='09:00';
+    if(timeStr){
+      const [hh,mm]=timeStr.split(':').map(Number);
+      const endH=Math.min(23,hh+1);
+      endStr=`${String(endH).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    }
+    document.getElementById('ev-start').value=timeStr||'08:00';
+    document.getElementById('ev-end').value=endStr;
+    document.getElementById('ev-date').value=dateStr||fmtDate(State.now);
+    document.getElementById('ev-note').value='';
+    document.getElementById('ev-pomodoro').checked=false;
+    document.getElementById('ev-focus').checked=false;
+    setMColor('ev-purple'); setMRecur('none'); setMDiff(0);
+  }
+  document.getElementById('ev-title').style.borderColor='';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('ev-title').focus(),100);
+}
+
+function closeModal(){ document.getElementById('modal-overlay').classList.remove('open'); }
+
+function setMColor(c){ State.selectedColor=c; document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('selected',s.dataset.color===c)); }
+function setMRecur(r){ State.selectedRecur=r; document.querySelectorAll('.recur-pill').forEach(p=>p.classList.toggle('selected',p.dataset.recur===r)); }
+function setMDiff(d){ State.selectedDiff=Number(d); document.querySelectorAll('.diff-opt').forEach(o=>o.classList.toggle('selected',Number(o.dataset.diff)===State.selectedDiff)); }
+
+document.querySelectorAll('.color-swatch').forEach(s=>s.addEventListener('click',()=>setMColor(s.dataset.color)));
+document.querySelectorAll('.recur-pill').forEach(p=>p.addEventListener('click',()=>setMRecur(p.dataset.recur)));
+document.querySelectorAll('.diff-opt').forEach(o=>o.addEventListener('click',()=>setMDiff(o.dataset.diff)));
+document.getElementById('modal-overlay').addEventListener('click',e=>{ if(e.target===document.getElementById('modal-overlay'))closeModal(); });
+
+function saveEvent() {
+  const title=document.getElementById('ev-title').value.trim();
+  if(!title){ document.getElementById('ev-title').style.borderColor='var(--accent-danger)'; document.getElementById('ev-title').focus(); return; }
+  document.getElementById('ev-title').style.borderColor='';
+  const ev={
+    id: State.editingEventId||uid(),
+    title,
+    date:  document.getElementById('ev-date').value,
+    start: document.getElementById('ev-start').value,
+    end:   document.getElementById('ev-end').value,
+    color: State.selectedColor,
+    recur: State.selectedRecur,
+    diff:  State.selectedDiff,
+    note:  document.getElementById('ev-note').value,
+    pomodoro: document.getElementById('ev-pomodoro').checked,
+    focus:    document.getElementById('ev-focus').checked,
+  };
+  // Validate start < end
+  if(ev.start>=ev.end){ showToast('⚠️','Lỗi','Giờ bắt đầu phải trước giờ kết thúc.','warn'); return; }
+  if(State.editingEventId) {
+    State.events=State.events.map(e=>e.id===State.editingEventId?ev:e);
+  } else {
+    State.events.push(ev);
+  }
+  saveToStorage(); closeModal(); renderCalendar(); renderMiniCal(); updateWorkload(); updateUpcoming();
+  showToast('✅','Đã lưu',`"${title}" đã thêm vào lịch.`,'success');
+}
+
+function deleteCurrentEvent() {
+  if(!confirm('Xóa sự kiện này?'))return;
+  State.events=State.events.filter(e=>e.id!==State.editingEventId);
+  saveToStorage(); closeModal(); renderCalendar(); renderMiniCal(); updateWorkload(); updateUpcoming();
+  showToast('🗑','Đã xóa','Sự kiện đã được xóa.','');
+}
+
+/* =====================================================
+   TASK LIST
+   ===================================================== */
+function addTask() {
+  const inp=document.getElementById('task-input'), text=inp.value.trim();
+  if(!text)return;
+  State.tasks.push({id:uid(),text,done:false,diff:0});
+  inp.value=''; saveToStorage(); renderTasks();
+}
+
+function renderTasks() {
+  const list=document.getElementById('task-list'); list.innerHTML='';
+  const pending=State.tasks.filter(t=>!t.done);
+  const done=State.tasks.filter(t=>t.done);
+  [...pending,...done].forEach(task=>{
+    const item=document.createElement('div');
+    item.className='task-item'+(task.done?' done':'');
+    item.innerHTML=`
+      <div class="task-check${task.done?' checked':''}" onclick="toggleTask('${task.id}')"></div>
+      <div class="task-text">${escHtml(task.text)}</div>
+      <div class="task-difficulty">${[1,2,3,4,5].map(i=>`<span class="diff-star${i<=task.diff?' active':''}" onclick="setTaskDiff('${task.id}',${i})">★</span>`).join('')}</div>
+      <button class="task-delete" onclick="deleteTask('${task.id}')" title="Xóa">✕</button>
+    `;
+    list.appendChild(item);
+  });
+  document.getElementById('task-badge').textContent=pending.length;
+}
+
+function escHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function toggleTask(id){ const t=State.tasks.find(t=>t.id===id); if(t)t.done=!t.done; saveToStorage(); renderTasks(); }
+function deleteTask(id){ State.tasks=State.tasks.filter(t=>t.id!==id); saveToStorage(); renderTasks(); }
+function setTaskDiff(id,d){ const t=State.tasks.find(t=>t.id===id); if(t)t.diff=d; saveToStorage(); renderTasks(); }
+
+/* =====================================================
+   POMODORO
+   ===================================================== */
+const POMO_DUR  = {focus:25*60, short:5*60, long:15*60};
+const POMO_NAME = {focus:'🍅 Tập trung', short:'☕ Nghỉ ngắn', long:'🛏 Nghỉ dài'};
+
+function updatePomoUI() {
+  const p=State.pomodoro;
+  const mm=Math.floor(p.seconds/60), ss=p.seconds%60;
+  const ts=`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  document.getElementById('pomo-timer').textContent=ts;
+  document.getElementById('pomo-label').textContent=POMO_NAME[p.phase];
+  document.getElementById('pomo-bar').style.width=(p.seconds/p.totalSeconds*100)+'%';
+  document.getElementById('pomo-start-btn').textContent=p.running&&!p.paused?'⏸ Tạm dừng':'▶ Bắt đầu';
+  const sess=p.session%4;
+  document.getElementById('pomo-sessions').textContent=Array.from({length:4},(_,i)=>i<sess?'🍅':'⬜').join('');
+  if(State.focusModeActive){
+    document.getElementById('focus-pomo-time').textContent=ts;
+    const statusTxt = p.phase==='focus' ? 'Tập trung' : 'Nghỉ ngơi';
+    document.getElementById('focus-pomo-label').textContent=`${statusTxt} • Phiên ${p.session%4+1}/4`;
+    const fBtn = document.getElementById('focus-pause-btn');
+    if (fBtn) fBtn.textContent = p.running && !p.paused ? '⏸ Tạm dừng' : '▶ Bắt đầu';
+  }
+  document.getElementById('stat-focused').textContent=`${Math.floor(p.focusMinutesToday/60)}h ${p.focusMinutesToday%60}m`;
+  document.getElementById('stat-pomos').textContent=p.completedToday;
+}
+
+function startPomodoro() {
+  const p=State.pomodoro;
+  if(p.running&&!p.paused){ p.paused=true; clearInterval(p.interval); updatePomoUI(); return; }
+  if(p.paused){ p.paused=false; }
+  else { p.phase='focus'; p.seconds=POMO_DUR.focus; p.totalSeconds=POMO_DUR.focus; }
+  p.running=true;
+  p.interval=setInterval(()=>{
+    if(p.paused)return;
+    p.seconds--;
+    if(p.phase==='focus') p.focusMinutesToday=Math.floor((p.totalSeconds-p.seconds)/60)+(p.completedToday*25);
+    if(p.seconds<=0) nextPomoPhase();
+    updatePomoUI();
+  },1000);
+  updatePomoUI();
+}
+
+function nextPomoPhase() {
+  const p=State.pomodoro; clearInterval(p.interval);
+  if(p.phase==='focus'){
+    p.session++; p.completedToday++;
+    const isLong=p.session%4===0;
+    p.phase=isLong?'long':'short';
+    showToast('🍅','Pomodoro xong!',isLong?'Nghỉ dài 15 phút nào!':'Nghỉ ngắn 5 phút.','pomo');
+  } else {
+    p.phase='focus'; showToast('⏰','Hết giờ nghỉ','Bắt đầu tập trung lại!','pomo');
+  }
+  p.seconds=POMO_DUR[p.phase]; p.totalSeconds=POMO_DUR[p.phase]; startPomodoro();
+}
+
+function resetPomodoro() {
+  const p=State.pomodoro; clearInterval(p.interval);
+  p.running=false; p.paused=false; p.phase='focus';
+  p.seconds=POMO_DUR.focus; p.totalSeconds=POMO_DUR.focus; updatePomoUI();
+}
+function skipPomodoro(){ State.pomodoro.seconds=1; }
+
+/* =====================================================
+   FOCUS MODE
+   ===================================================== */
+function enterFocusMode() {
+  State.focusModeActive=true;
+  document.getElementById('app').classList.add('focus-hidden');
+  document.getElementById('focus-overlay').classList.add('active');
+  if (window.electronAPI && typeof window.electronAPI.setFullscreen === 'function') {
+    window.electronAPI.setFullscreen(true);
+  }
+  updatePomoUI();
+}
+function exitFocusMode(){
+  if (!State.focusModeActive) return;
+  State.focusModeActive=false;
+  document.getElementById('focus-overlay').classList.remove('active');
+  document.getElementById('app').classList.remove('focus-hidden');
+  if (window.electronAPI && typeof window.electronAPI.setFullscreen === 'function') {
+    window.electronAPI.setFullscreen(false);
+  }
+}
+function focusPauseResume(){
+  startPomodoro();
+}
+
+/* =====================================================
+   UPCOMING & WORKLOAD
+   ===================================================== */
+function updateUpcoming() {
+  const now=State.now, todayStr=fmtDate(now);
+  const tmrStr=fmtDate(new Date(now.getTime()+86400000));
+  const list=[];
+  [todayStr,tmrStr].forEach((dStr,di)=>{
+    getEventsForDate(dStr).forEach(ev=>{
+      const [h,m]=ev.start.split(':').map(Number);
+      const t=new Date(now); t.setDate(now.getDate()+di); t.setHours(h,m,0,0);
+      const diff=t-now;
+      if(diff>-3600000&&diff<172800000) list.push({...ev,evTime:t,diff,dateStr:dStr});
+    });
+  });
+  list.sort((a,b)=>a.evTime-b.evTime);
+  const ul=document.getElementById('upcoming-list'); ul.innerHTML='';
+  list.slice(0,5).forEach(ev=>{
+    const item=document.createElement('div'); item.className='upcoming-item';
+    item.style.borderLeftColor=colorHex(ev.color);
+    const dm=Math.round(ev.diff/60000);
+    const tl=dm<0?'Đang diễn ra':dm<60?`${dm} phút nữa`:dm<1440?`${Math.floor(dm/60)}h ${dm%60}m nữa`:`Ngày mai ${ev.start}`;
+    const tags=[ev.pomodoro?'🍅 Pomodoro':'',ev.focus?'🔕 Focus':'',ev.recur!=='none'?'🔁 Lặp':''].filter(Boolean);
+    item.innerHTML=`<div class="ui-title">${escHtml(ev.title)}</div><div class="ui-time">${tl} • ${ev.start}–${ev.end}</div>${tags.length?`<div class="ui-tags">${tags.map(t=>`<span class="ui-tag">${t}</span>`).join('')}</div>`:''}`;
+    item.addEventListener('click',()=>openModal(ev.id)); ul.appendChild(item);
+  });
+  if(!list.length) ul.innerHTML='<div style="font-size:0.72rem;color:var(--text-muted);text-align:center;padding:14px 0">Không có sự kiện sắp tới ✨</div>';
+}
+
+function colorHex(c){
+  return {'ev-purple':'#c084fc','ev-blue':'#818cf8','ev-green':'#34d399','ev-amber':'#f59e0b','ev-red':'#f87171','ev-teal':'#2dd4bf','ev-pink':'#ec4899'}[c]||'#c084fc';
+}
+
+function updateWorkload() {
+  const dStr=fmtDate(State.viewDate), evs=getEventsForDate(dStr);
+  const bars=document.getElementById('workload-bars'); bars.innerHTML='';
+  const subMap={};
+  evs.forEach(ev=>{
+    // Extract meaningful subject name (skip emoji prefix)
+    const name=ev.title.replace(/^[\p{Emoji}\s]+/u,'').split(' ')[0]||ev.title;
+    if(!subMap[name]) subMap[name]={total:0,diff:0};
+    const [sh,sm]=ev.start.split(':').map(Number);
+    const [eh,em]=ev.end.split(':').map(Number);
+    subMap[name].total+=(eh*60+em)-(sh*60+sm);
+    subMap[name].diff=Math.max(subMap[name].diff,ev.diff||0);
+  });
+  Object.entries(subMap).slice(0,5).forEach(([name,{total,diff}])=>{
+    const pct=Math.min((total/120)*100,100);
+    const col=diff>=4?'var(--accent-danger)':diff>=2?'var(--accent-warn)':'var(--accent3)';
+    bars.innerHTML+=`<div class="workload-bar"><div class="wb-label"><span class="wb-name">${escHtml(name)}</span><span class="wb-val">${(total/60).toFixed(1)}h</span></div><div class="wb-track"><div class="wb-fill" style="width:${pct}%;background:${col}"></div></div></div>`;
+  });
+  // Warning
+  const warn=document.getElementById('warning-banner');
+  const heavyCount=evs.filter(e=>e.diff>=4).length;
+  if(heavyCount>=2){
+    warn.style.display='block';
+    document.getElementById('warning-desc').textContent=`Hôm nay có ${heavyCount} môn khó (độ khó ≥4). Hệ thống cảnh báo nguy cơ kiệt sức! Hãy cân nhắc sắp xếp lại.`;
+    document.getElementById('stat-load').textContent=heavyCount>=3?'🔴 Quá tải':'🟡 Nặng';
+    document.getElementById('stat-load').className='stat-val '+(heavyCount>=3?'danger':'warn');
+  } else {
+    warn.style.display='none';
+    const totalD=evs.reduce((s,e)=>s+(e.diff||0),0);
+    document.getElementById('stat-load').textContent=totalD>8?'🟡 Vừa phải':'🟢 Nhẹ';
+    document.getElementById('stat-load').className='stat-val';
+  }
+  // 7-day chart
+  const ibs=document.getElementById('insight-bars'), ils=document.getElementById('insight-labels');
+  ibs.innerHTML=''; ils.innerHTML='';
+  const today=State.now;
+  for(let i=6;i>=0;i--){
+    const d=new Date(today); d.setDate(today.getDate()-i);
+    const load=getEventsForDate(fmtDate(d)).reduce((s,e)=>s+(e.diff||0),0);
+    const h=Math.max((load/18)*100,3);
+    const col=load>14?'var(--accent-danger)':load>7?'var(--accent-warn)':'rgba(192,132,252,0.4)';
+    ibs.innerHTML+=`<div class="insight-bar" style="height:${h}%;background:${col}" title="${DOW_SHORT[d.getDay()]}: tải ${load}"></div>`;
+    ils.innerHTML+=`<div class="il-label">${DOW_SHORT[d.getDay()]}</div>`;
+  }
+}
+
+/* =====================================================
+   FOCUS SESSIONS
+   ===================================================== */
+function renderFocusSessions() {
+  const list=document.getElementById('focus-session-list'); list.innerHTML='';
+  if(!State.focusSessions.length){
+    list.innerHTML='<div style="font-size:0.72rem;color:var(--text-muted);text-align:center">Chưa có phiên tập trung</div>'; return;
+  }
+  State.focusSessions.slice(-5).reverse().forEach(fs=>{
+    const item=document.createElement('div'); item.className='focus-session-item';
+    item.innerHTML=`<span class="fsi-name">${escHtml(fs.name)}</span><span class="fsi-time">${fs.duration}m</span>`;
+    list.appendChild(item);
+  });
+}
+
+function startFocusBlock() {
+  const name=prompt('Tên phiên tập trung:','Học tập');
+  if(!name||!name.trim())return;
+  State.focusSessions.push({id:uid(),name:name.trim(),duration:25,date:fmtDate(State.now)});
+  saveToStorage(); renderFocusSessions(); enterFocusMode(name.trim());
+}
+
+/* =====================================================
+   TOAST NOTIFICATIONS
+   ===================================================== */
+function showToast(icon, title, desc, type) {
+  const c=document.getElementById('toast-container');
+  const t=document.createElement('div');
+  t.className=`toast${type?' '+type:''}`;
+  t.innerHTML=`<div class="toast-icon">${icon}</div><div><div class="toast-title">${title}</div><div class="toast-desc">${desc}</div></div>`;
+  c.appendChild(t);
+  if('Notification' in window && Notification.permission==='granted'){
+    new Notification("gkiet's space",{body:desc?`${title} — ${desc}`:title,icon:'./icon.ico'});
+  }
+  setTimeout(()=>{ t.classList.add('removing'); setTimeout(()=>t.remove(),300); },4000);
+}
+
+if('Notification' in window && Notification.permission==='default'){
+  Notification.requestPermission();
+}
+
+/* =====================================================
+   MOBILE RESPONSIVE
+   ===================================================== */
+function toggleMobileLeft() {
+  const sl=document.getElementById('sidebar-left');
+  const bd=document.getElementById('mobile-backdrop');
+  const open=sl.classList.toggle('mobile-open');
+  bd.classList.toggle('open',open);
+  document.getElementById('sidebar-right').classList.remove('mobile-open');
+}
+function toggleMobileRight() {
+  const sr=document.getElementById('sidebar-right');
+  const bd=document.getElementById('mobile-backdrop');
+  const open=sr.classList.toggle('mobile-open');
+  bd.classList.toggle('open',open);
+  document.getElementById('sidebar-left').classList.remove('mobile-open');
+}
+function closeMobileDrawers() {
+  document.getElementById('sidebar-left').classList.remove('mobile-open');
+  document.getElementById('sidebar-right').classList.remove('mobile-open');
+  document.getElementById('mobile-backdrop').classList.remove('open');
+}
+
+// Show mobile right button on small screens
+function handleResponsive() {
+  const isMobile=window.innerWidth<=700;
+  document.getElementById('mobile-menu-btn').style.display=isMobile?'flex':'none';
+  document.getElementById('mobile-right-btn').style.display=isMobile?'flex':'none';
+  if(!isMobile) closeMobileDrawers();
+}
+
+/* =====================================================
+   KEYBOARD SHORTCUTS
+   ===================================================== */
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  const k=e.key;
+  if(k==='n'||k==='N') openModal();
+  if(k==='Escape'){ closeModal(); exitFocusMode(); }
+  if(k===' '){ e.preventDefault(); sendSpotifyMedia('playpause'); }
+  if(k==='p'||k==='P') startPomodoro();
+  if(k==='w') setView('week');
+  if(k==='d') setView('day');
+  if(k==='m') setView('month');
+  if(k==='t'||k==='T') goToday();
+  if(k==='ArrowLeft') navCalendar(-1);
+  if(k==='ArrowRight') navCalendar(1);
+});
+
+/* =====================================================
+   VIEW SWITCHER (topbar nav)
+   ===================================================== */
+function switchMainView(v) {
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes('Lịch')));
+}
+
+/* =====================================================
+   INIT
+   ===================================================== */
+function init() {
+  resizeCanvases();
+  window.addEventListener('resize',()=>{ resizeCanvases(); handleResponsive(); });
+  drawBackground();
+  loadFromStorage();
+  renderCalendar();
+  renderMiniCal();
+  renderTasks();
+  renderFocusSessions();
+  updateWorkload();
+  updateUpcoming();
+  updatePomoUI();
+  handleResponsive();
+  setInterval(updateClock,1000);
+  setInterval(updateUpcoming,60000);
+  updateClock();
+  // Welcome toast
+  setTimeout(()=>{
+    showToast('✨',"Chào mừng đến gkiet's space!",'Nhấn N để thêm sự kiện • Space để phát/dừng Spotify','success');
+  },800);
+}
+
+/* =====================================================
+   SIDEBAR & MODE MENU TOGGLES (persisted in localStorage)
+   ===================================================== */
+function toggleSidebar() {
+  const collapsed = document.getElementById('app').classList.toggle('sidebar-collapsed');
+  try { localStorage.setItem('ls_sidebar_collapsed', collapsed ? '1' : '0'); } catch(e) {}
+}
+
+function applyModeMenuState(collapsed) {
+  const items = document.getElementById('mode-menu-items');
+  const btn   = document.getElementById('mode-menu-toggle');
+  if (!items || !btn) return;
+  items.classList.toggle('collapsed', collapsed);
+  btn.textContent = collapsed ? '>' : '<';
+  btn.title = collapsed ? 'Mở rộng menu chế độ' : 'Thu gọn menu chế độ';
+}
+
+function toggleModeMenu() {
+  const items = document.getElementById('mode-menu-items');
+  const collapsed = !items.classList.contains('collapsed');
+  applyModeMenuState(collapsed);
+  try { localStorage.setItem('ls_mode_menu_collapsed', collapsed ? '1' : '0'); } catch(e) {}
+}
+
+function restoreMenuStates() {
+  try {
+    if (localStorage.getItem('ls_sidebar_collapsed') === '1') {
+      document.getElementById('app').classList.add('sidebar-collapsed');
+    }
+    if (localStorage.getItem('ls_mode_menu_collapsed') === '1') {
+      applyModeMenuState(true);
+    }
+  } catch(e) {}
+}
+
+/* =====================================================
+   SPOTIFY NOW PLAYING (Electron Desktop IPC)
+   ===================================================== */
+const SP_DEFAULT_SVG = '<svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>';
+const SP_PLAY_SVG    = '<svg viewBox="0 0 16 16"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>';
+const SP_PAUSE_SVG   = '<svg viewBox="0 0 16 16"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>';
+
+function updateSpotifyWidget(data) {
+  const widget   = document.getElementById('spotify-widget');
+  const artEl    = document.getElementById('sp-art');
+  const trackEl  = document.getElementById('sp-track');
+  const wrapEl   = document.getElementById('sp-track-wrap');
+  const artistEl = document.getElementById('sp-artist');
+  const playBtn  = document.getElementById('sp-playpause');
+  if (!widget || !trackEl || !artistEl || !artEl) return;
+
+  trackEl.classList.remove('marquee');
+  trackEl.style.removeProperty('--marquee-dist');
+
+  if (!data || !data.playing) {
+    widget.classList.remove('playing');
+    trackEl.textContent  = 'Spotify đang tạm dừng';
+    artistEl.textContent = 'Đang chờ phát nhạc';
+    widget.title = 'Spotify đang tạm dừng';
+    artEl.innerHTML = SP_DEFAULT_SVG;
+    if (playBtn) playBtn.innerHTML = SP_PLAY_SVG;
+    return;
+  }
+
+  widget.classList.add('playing');
+  trackEl.textContent  = data.track || 'Đang phát';
+  artistEl.textContent = data.artist || 'Spotify';
+  widget.title = `${data.track} — ${data.artist}`;
+  if (playBtn) playBtn.innerHTML = SP_PAUSE_SVG;
+
+  if (data.thumbnail) {
+    artEl.innerHTML = `<img src="${data.thumbnail}" alt="cover">`;
+  } else {
+    artEl.innerHTML = SP_DEFAULT_SVG;
+  }
+
+  // Trigger marquee if track title overflows container
+  requestAnimationFrame(() => {
+    const overflow = trackEl.scrollWidth - wrapEl.clientWidth;
+    if (overflow > 4) {
+      trackEl.style.setProperty('--marquee-dist', `-${overflow + 12}px`);
+      trackEl.classList.add('marquee');
+    }
+  });
+}
+
+function sendSpotifyMedia(action) {
+  if (window.electronAPI && typeof window.electronAPI.sendMediaKey === 'function') {
+    window.electronAPI.sendMediaKey(action);
+  }
+}
+
+function initSpotify() {
+  if (window.electronAPI && typeof window.electronAPI.onSpotifyUpdate === 'function') {
+    window.electronAPI.onSpotifyUpdate((data) => updateSpotifyWidget(data));
+  }
+}
+
+init();
+restoreMenuStates();
+initSpotify();
+</script>
+</body>
+</html>
